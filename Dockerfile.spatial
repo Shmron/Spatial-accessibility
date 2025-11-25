@@ -1,0 +1,33 @@
+FROM python:3.11-slim
+
+# Install system dependencies for geospatial libraries
+RUN apt-get update && apt-get install -y \
+    gdal-bin \
+    libgdal-dev \
+    libspatialindex-dev \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set GDAL environment variables
+ENV GDAL_CONFIG=/usr/bin/gdal-config
+ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
+ENV C_INCLUDE_PATH=/usr/include/gdal
+
+# Install Python geospatial packages
+RUN pip install --no-cache-dir \
+    geopandas==0.14.1 \
+    h3==3.7.6 \
+    rasterio==1.3.9 \
+    pandas==2.1.4 \
+    numpy==1.26.2 \
+    matplotlib==3.8.2 \
+    scipy==1.11.4 \
+    requests==2.31.0 \
+    Rtree==1.1.0
+
+# Set working directory
+WORKDIR /workspace
+
+# Default command
+CMD ["/bin/bash"]
