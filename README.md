@@ -38,7 +38,7 @@ data/
 **IMPORTANT**: Run validation first to catch data issues:
 
 ```bash
-python scripts/00_validate_data.py
+python3 scripts/00_validate_data.py
 ```
 
 This checks:
@@ -50,7 +50,7 @@ This checks:
 **If you have projected coordinates** (large numbers like 682222), convert them:
 
 ```bash
-python scripts/00b_convert_coordinates.py
+python3 scripts/00b_convert_coordinates.py
 ```
 
 ### 3. Build Docker Container
@@ -194,7 +194,7 @@ The workflow outputs facility-level metrics:
 
 **Solution**:
 ```bash
-python scripts/00b_convert_coordinates.py
+python3 scripts/00b_convert_coordinates.py
 ```
 
 ### Issue: "Column 'name' not found in facilities CSV"
@@ -243,10 +243,10 @@ The `-resume` flag skips already-completed steps.
 
 ```bash
 # 1. Validate data
-python scripts/00_validate_data.py
+python3 scripts/00_validate_data.py
 
 # 2. Convert coordinates (if needed)
-python scripts/00b_convert_coordinates.py
+python3 scripts/00b_convert_coordinates.py
 
 # 3. Run workflow
 nextflow run spatial_access_workflow.nf \
@@ -330,10 +330,6 @@ If you use this workflow, please cite:
 - **Nextflow**: Di Tommaso P, et al. (2017) Nextflow enables reproducible computational workflows. Nature Biotechnology 35, 316–319
 - **H3**: Uber H3: https://h3geo.org/
 - **OSRM**: Luxen D & Vetter C (2011) Real-time routing with OpenStreetMap data. ACM GIS
-
-## Workshop Presentation
-
-See **WORKSHOP_GUIDE.md** for detailed presentation materials, talking points, and demonstration scripts.
 
 ## License
 
