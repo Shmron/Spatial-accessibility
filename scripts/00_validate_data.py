@@ -139,7 +139,6 @@ def main():
     # Define expected file paths (organized structure)
     data_dir = Path("data")
 
-    boundaries_zip = data_dir / "geoBoundaries-TGO-ADM2-all.zip"
     boundaries_shp = data_dir / "boundaries" / "geoBoundaries-TGO-ADM2.shp"
     osm_pbf = data_dir / "roads" / "togo-latest.osm.pbf"
     population_tif = data_dir / "population" / "tgo_pop_2025_CN_100m_R2025A_v1.tif"
@@ -148,7 +147,20 @@ def main():
     print("\n1. Checking for input files...")
 
     all_present = True
-    all_present &= check_file_exists(boundaries_zip, "Boundaries ZIP")
+
+    # Check for shapefile (or any .shp in boundaries folder)
+    if boundaries_shp.exists():
+        all_present &= check_file_exists(boundaries_shp, "Boundaries shapefile")
+    else:
+        # Try to find any .shp file in boundaries folder
+        shp_files = list((data_dir / "boundaries").glob("*.shp"))
+        if shp_files:
+            boundaries_shp = shp_files[0]
+            all_present &= check_file_exists(boundaries_shp, "Boundaries shapefile")
+        else:
+            print(f"  [FAIL] Boundaries shapefile: NOT FOUND in data/boundaries/")
+            all_present = False
+
     all_present &= check_file_exists(osm_pbf, "OSM PBF")
     all_present &= check_file_exists(population_tif, "Population raster")
     all_present &= check_file_exists(facilities_csv, "Facilities CSV")
@@ -157,9 +169,6 @@ def main():
         print("\n[FAIL] Some required files are missing!")
         print("  Please ensure all files are in the data/ directory")
         sys.exit(1)
-
-    # Extract boundaries
-    boundaries_shp = extract_boundaries_zip(boundaries_zip, data_dir / "boundaries")
 
     # Validate facilities CSV
     facilities_ok = validate_facilities_csv(facilities_csv)

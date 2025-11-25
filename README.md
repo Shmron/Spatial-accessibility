@@ -33,9 +33,9 @@ data/
 - **Population**: https://www.worldpop.org/
 - **Facilities**: Your survey data or government records
 
-### 2. Validate Your Data
+### 2. (Optional) Validate Your Data
 
-**IMPORTANT**: Run validation first to catch data issues:
+**Optional but recommended**: Run validation to catch data issues early:
 
 ```bash
 python3 scripts/00_validate_data.py
@@ -47,11 +47,13 @@ This checks:
 - CSV columns are properly named
 - Data bounds are reasonable
 
-**If you have projected coordinates** (large numbers like 682222), convert them:
+**If validation detects projected coordinates** (large numbers like 682222):
 
 ```bash
 python3 scripts/00b_convert_coordinates.py
 ```
+
+**Note**: The workflow includes basic validation, so you can skip these scripts if your data is clean.
 
 ### 3. Build Docker Container
 
@@ -242,18 +244,18 @@ The `-resume` flag skips already-completed steps.
 ## Example: Togo Healthcare Access
 
 ```bash
-# 1. Validate data
+# 1. (Optional) Validate data
 python3 scripts/00_validate_data.py
 
-# 2. Convert coordinates (if needed)
+# 2. (Optional) Convert coordinates if needed
 python3 scripts/00b_convert_coordinates.py
 
 # 3. Run workflow
 nextflow run spatial_access_workflow.nf \
-  --osm_pbf data/togo-latest.osm.pbf \
+  --osm_pbf data/roads/togo-latest.osm.pbf \
   --districts_shp data/boundaries/geoBoundaries-TGO-ADM2.shp \
-  --facilities_csv data/Togo_Health_Facilities_wgs84.csv \
-  --population_tif data/tgo_pop_2025_CN_100m_R2025A_v1.tif \
+  --facilities_csv data/facilities/Togo_Health_Facilities_wgs84.csv \
+  --population_tif data/population/tgo_pop_2025_CN_100m_R2025A_v1.tif \
   --facility_type healthcare \
   --hex_resolution 8 \
   --outdir results/togo_healthcare
@@ -339,7 +341,7 @@ MIT License
 
 For questions or issues:
 1. Check this README
-2. Run `python scripts/00_validate_data.py`
+2. Run `python3 scripts/00_validate_data.py`
 3. Open a GitHub issue
 
 ## Author
