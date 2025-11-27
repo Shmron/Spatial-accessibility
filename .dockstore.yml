@@ -1,0 +1,24 @@
+version: 1.2
+workflows:
+  - name: spatial-accessibility-workflow
+    subclass: Nextflow
+    primaryDescriptorPath: /spatial_access_workflow.nf
+    testParameterFiles:
+      - /test_params.json
+    authors:
+      - name: Rutendo Sibanda
+        orcid: 0009-0000-6835-2684
+    description: >
+      Containerized workflow for analyzing spatial accessibility to health facilities.
+      Uses Nextflow, Docker, OSRM routing, and H3 hexagonal grids to calculate
+      comprehensive accessibility metrics including distance, population coverage,
+      and service area analysis. Fully reproducible via Docker Hub containers.
+    labels:
+      - spatial-accessibility
+      - health-equity
+      - nextflow
+      - docker
+      - osrm
+      - h3-grid
+      - geospatial
+      - reproducible-research

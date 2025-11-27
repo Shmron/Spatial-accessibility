@@ -1,0 +1,11 @@
+{
+  "osm_pbf": "data/roads/togo-latest.osm.pbf",
+  "districts_shp": "data/boundaries/geoBoundaries-TGO-ADM2_simplified.shp",
+  "facilities_csv": "data/facilities/Togo_Health_Facilities_hotosm.csv",
+  "population_tif": "data/population/tgo_pop_2025_CN_100m_R2025A_v1.tif",
+  "facility_type": "health",
+  "hex_resolution": 8,
+  "osrm_host": "localhost",
+  "osrm_port": 5000,
+  "outdir": "results"
+}
