@@ -3,7 +3,7 @@ nextflow.enable.dsl=2
 
 /*
 ========================================================================================
-   Spatial Access to Care/Education Workflow
+   Spatial Access to Health Facilities Workflow
 ========================================================================================
    Calculates spatial accessibility metrics using:
    - OSM routing network (OSRM)
@@ -20,11 +20,11 @@ nextflow.enable.dsl=2
 // PARAMETERS
 // ============================================
 
-params.osm_pbf = null
-params.districts_shp = null
-params.facilities_csv = null
-params.population_tif = null
-params.facility_type = "school"
+params.osm_pbf = "data/roads/togo-latest.osm.pbf"
+params.districts_shp = "data/boundaries/geoBoundaries-TGO-ADM2_simplified.shp"
+params.facilities_csv = "data/facilities/Togo_Health_Facilities_wgs84.csv"
+params.population_tif = "data/population/tgo_pop_2025_CN_100m_R2025A_v1.tif"
+params.facility_type = "health"
 params.hex_resolution = 8
 params.osrm_host = "localhost"
 params.osrm_port = 5000
@@ -35,29 +35,21 @@ params.help = false
 if (params.help) {
     log.info"""
     ================================================================
-    Spatial Access to Care/Education Workflow
+    Spatial Access to Health Facilities Workflow
     ================================================================
 
     Usage:
-      nextflow run spatial_access_workflow.nf \\
-        --osm_pbf data/region.osm.pbf \\
-        --districts_shp data/districts.shp \\
-        --facilities_csv data/facilities.csv \\
-        --population_tif data/population.tif \\
-        --facility_type school \\
-        --outdir results
+      nextflow run spatial_access_workflow.nf
 
-    Required Parameters:
-      --osm_pbf           Path to OSM PBF file
-      --districts_shp     Path to districts shapefile
-      --facilities_csv    Path to facilities CSV (columns: name, latitude, longitude)
-      --population_tif    Path to population raster (TIF)
+    Default Data Paths (can be overridden):
+      --osm_pbf           data/roads/togo-latest.osm.pbf
+      --districts_shp     data/boundaries/geoBoundaries-TGO-ADM2_simplified.shp
+      --facilities_csv    data/facilities/Togo_Health_Facilities_wgs84.csv
+      --population_tif    data/population/tgo_pop_2025_CN_100m_R2025A_v1.tif
 
     Optional Parameters:
-      --facility_type     Type of facility (default: 'school')
+      --facility_type     Type of facility (default: 'health')
       --hex_resolution    H3 hexagon resolution (default: 8)
-      --osrm_host         OSRM server host (default: 'localhost')
-      --osrm_port         OSRM server port (default: 5000)
       --outdir            Output directory (default: 'results')
 
     Output:
@@ -94,7 +86,37 @@ process setupOSRM {
 
     script:
     """
-    bash ${projectDir}/scripts/01_setup_osrm.sh ${osm_pbf} osrm_data
+    set -e
+
+    echo "Setting up OSRM routing network..."
+    echo "Input PBF: ${osm_pbf}"
+
+    mkdir -p osrm_data
+
+    # Copy PBF to output directory and work there
+    cp "${osm_pbf}" osrm_data/
+    cd osrm_data
+
+    FILENAME=\$(basename "${osm_pbf}")
+
+    # Extract the network
+    echo "Step 1/3: Extracting network..."
+    osrm-extract -p /opt/car.lua "\$FILENAME"
+
+    # Get base name for .osrm files
+    OSRM_BASE="\${FILENAME%.osm.pbf}"
+    OSRM_BASE="\${OSRM_BASE%.pbf}"
+
+    # Partition the network
+    echo "Step 2/3: Partitioning network..."
+    osrm-partition "\${OSRM_BASE}.osrm"
+
+    # Customize the network
+    echo "Step 3/3: Customizing network..."
+    osrm-customize "\${OSRM_BASE}.osrm"
+
+    echo "OSRM setup complete!"
+    ls -lh
     """
 }
 
@@ -106,7 +128,7 @@ process splitDistricts {
     container 'spatial-analysis:latest'
 
     input:
-    path districts_shp
+    path 'shapefile/*'
     path facilities_csv
 
     output:
@@ -118,9 +140,16 @@ process splitDistricts {
     import geopandas as gpd
     import pandas as pd
     from pathlib import Path
+    import glob
+
+    # Find the .shp file
+    shp_files = glob.glob("shapefile/*.shp")
+    if not shp_files:
+        raise FileNotFoundError("No .shp file found in shapefile directory")
+    shp_file = shp_files[0]
 
     # Read districts
-    districts = gpd.read_file("${districts_shp}")
+    districts = gpd.read_file(shp_file)
     facilities = pd.read_csv("${facilities_csv}")
 
     # Create output directory
@@ -169,7 +198,7 @@ process generateGrids {
 
     script:
     """
-    python ${projectDir}/scripts/02_generate_grids.py \\
+    python /scripts/02_generate_grids.py \\
         ${district_file} \\
         ${district_file.baseName}_grids.geojson \\
         ${hex_resolution}
@@ -193,7 +222,7 @@ process extractPopulation {
 
     script:
     """
-    python ${projectDir}/scripts/03_extract_population.py \\
+    python /scripts/03_extract_population.py \\
         ${grids_file} \\
         ${population_tif} \\
         ${district_name}_grids_pop.geojson
@@ -207,10 +236,10 @@ process extractPopulation {
 process filterFacilities {
     container 'spatial-analysis:latest'
     tag "${district_name}"
+    debug true
 
     input:
-    tuple val(district_name), path(grids_file)
-    path district_file
+    tuple val(district_name), path(grids_file), path(district_file)
     path facilities_csv
 
     output:
@@ -221,12 +250,21 @@ process filterFacilities {
     #!/usr/bin/env python3
     import geopandas as gpd
     import pandas as pd
+    import os
+
+    # Debug: Check what files exist
+    print(f"Working directory: {os.getcwd()}")
+    print(f"Files in directory: {os.listdir('.')}")
+    print(f"Facilities CSV path: ${facilities_csv}")
+    print(f"Facilities CSV exists: {os.path.exists('${facilities_csv}')}")
 
     # Read district
     district = gpd.read_file("${district_file}")
+    print(f"District loaded: {len(district)} features, CRS: {district.crs}")
 
     # Read facilities
     facilities = pd.read_csv("${facilities_csv}")
+    print(f"Facilities loaded from CSV: {len(facilities)}")
     facilities_gdf = gpd.GeoDataFrame(
         facilities,
         geometry=gpd.points_from_xy(facilities.longitude, facilities.latitude),
@@ -277,7 +315,7 @@ process calculateAccessibility {
 
     script:
     """
-    python ${projectDir}/scripts/04_calculate_accessibility.py \\
+    python /scripts/04_calculate_accessibility.py \\
         ${grids_file} \\
         ${facilities_file} \\
         ${district_name}_accessibility.geojson \\
@@ -303,7 +341,7 @@ process computeMetrics {
 
     script:
     """
-    python ${projectDir}/scripts/05_compute_metrics.py \\
+    python /scripts/05_compute_metrics.py \\
         ${accessibility_file} \\
         ${district_name} \\
         ${district_name}_metrics.csv
@@ -328,7 +366,7 @@ process createVisualization {
 
     script:
     """
-    python ${projectDir}/scripts/06_create_visualization.py \\
+    python /scripts/06_create_visualization.py \\
         ${accessibility_file} \\
         "${district_name}" \\
         ${district_name} \\
@@ -348,7 +386,7 @@ process aggregateSummary {
     path metrics_files
 
     output:
-    path "summary.csv"
+    path "summary.csv", emit: summary
 
     script:
     """
@@ -364,13 +402,39 @@ process aggregateSummary {
     if all_metrics:
         combined = pd.concat(all_metrics, ignore_index=True)
         combined.to_csv("summary.csv", index=False)
-        print(f"Combined {len(all_metrics)} district metric files")
+        print(f"Combined {len(all_metrics)} administrative unit metric files")
         print("\\nSummary Statistics:")
         print(combined[combined['facility_name'] == 'DISTRICT_TOTAL'][
             ['district', 'population_served', 'pop_weighted_distance_km']
         ].to_string(index=False))
     else:
         pd.DataFrame().to_csv("summary.csv", index=False)
+    """
+}
+
+// ============================================
+// PROCESS 10: Create Summary Statistics Table
+// ============================================
+
+process createSummaryTable {
+    container 'spatial-analysis:latest'
+    publishDir "${params.outdir}", mode: 'copy'
+
+    input:
+    path summary_csv
+    path 'boundaries/*'
+
+    output:
+    path "final_summary_table.png"
+    path "final_summary_by_unit.csv"
+    path "final_detailed_results.csv"
+
+    script:
+    """
+    python /scripts/07_create_summary_table.py \
+        ${summary_csv} \
+        boundaries/${params.districts_shp.split('/').last()} \
+        final
     """
 }
 
@@ -395,9 +459,14 @@ workflow {
 
     // Create input channels
     osm_pbf_ch = Channel.fromPath(params.osm_pbf, checkIfExists: true)
-    districts_ch = Channel.fromPath(params.districts_shp, checkIfExists: true)
-    facilities_ch = Channel.fromPath(params.facilities_csv, checkIfExists: true)
-    population_ch = Channel.fromPath(params.population_tif, checkIfExists: true)
+
+    // For shapefiles, we need to collect all component files (.shp, .shx, .dbf, .prj, etc.)
+    def shp_base = params.districts_shp.replaceAll(/\.shp$/, '')
+    districts_ch = Channel.fromPath("${shp_base}.*", checkIfExists: true).collect()
+
+    // Convert to value channels so they can be reused across all districts
+    facilities_ch = Channel.fromPath(params.facilities_csv, checkIfExists: true).first()
+    population_ch = Channel.fromPath(params.population_tif, checkIfExists: true).first()
 
     // Step 1: Setup OSRM (can run in parallel with district splitting)
     osrm_data = setupOSRM(osm_pbf_ch)
@@ -418,13 +487,15 @@ workflow {
     )
 
     // Step 5: Filter facilities per district
-    // Need to match district files with grids
-    district_files_ch = district_files.flatten()
+    // Match district files with grids by district name
+    district_files_with_name = district_files.flatten()
         .map { file -> tuple(file.baseName, file) }
 
+    // Combine grids with district files
+    grids_and_districts = grids_with_pop.join(district_files_with_name)
+
     district_facilities = filterFacilities(
-        grids_with_pop,
-        district_files_ch.map { it[1] },
+        grids_and_districts,
         facilities_ch
     )
 
@@ -451,6 +522,12 @@ workflow {
     // Step 10: Aggregate all metrics
     summary = aggregateSummary(metrics.collect())
 
+    // Step 11: Create summary statistics table with proper names
+    summary_table = createSummaryTable(
+        summary,
+        districts_ch
+    )
+
     // Print completion message
     summary.view {
         log.info """
@@ -458,6 +535,12 @@ workflow {
         Workflow Complete!
         ================================================================
         Results saved to: ${params.outdir}
+
+        Summary files created:
+        - summary.csv (combined metrics)
+        - final_summary_table.png (visualization)
+        - final_summary_by_unit.csv (summary by administrative unit)
+        - final_detailed_results.csv (detailed results with proper names)
         ================================================================
         """
     }
